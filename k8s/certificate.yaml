@@ -1,0 +1,20 @@
+apiVersion: cert-manager.io/v1alpha2
+kind: Certificate
+metadata:
+  name: fib-finley-dev-tls
+spec:
+  secretName: fib-finley-dev
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  commonName: fib.finley.dev
+  dnsNames:
+    - fib.finley.dev
+    - www.fib.finley.dev
+  acme:
+    config:
+      - http01:
+          ingressClass: nginx
+        domains:
+          - fib.finley.dev
+          - www.fib.finley.dev
