@@ -1,39 +1,41 @@
 sudo: required
 services:
   - docker
+env:
+  global:
+    - SHA=$(git rev-parse HEAD)
+    - CLOUDSDK_CORE_DISABLE_PROMPTS=1
 
 before_install:
+  - openssl aes-256-cbc -K $encrypted_b26cba57493f_key -iv $encrypted_b26cba57493f_iv -in svc-acc.json.enc -out svc-acc.json -d
   - curl https://sdk.cloud.google.com | bash > /dev/null; 
   - source $HOME/google-cloud-sdk/path.bash.inc
   - gcloud components update kubectl
   - gcloud auth activate-service-account --key-file service-account.json
-  - openssl aes-256-cbc -K $encrypted_b26cba57493f_key -iv $encrypted_b26cba57493f_iv -in svc-acc.json.enc -out svc-acc.json -d
+  - gcloud config set project multi-k8s-283320                              ## These three lines set gcloud configs
+  - gcloud config set compute/zone us-central1-c                            ## These three lines set gcloud configs
+  - gcloud container clusters get-credentials multi-cluster                 ## These three lines set gcloud configs
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_ID" --password-stdin
+  - docker build -t finleymcilwaine/react-test -f ./client/Dockerfile.dev ./client
 
 script:
   - docker run -e CI=true finleymcilwaine/react-test npm test
 
 after_success:
-  - docker build -t finleymcilwaine/multi-client ./client
-  - docker build -t finleymcilwaine/multi-nginx ./nginx
-  - docker build -t finleymcilwaine/multi-server ./server
-  - docker build -t finleymcilwaine/multi-worker ./worker
-  # Log in to the Docker CLI
-  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_ID" --password-stdin
+  # Build the production images
+  - docker build -t finleymcilwaine/multi-client:latest -t finleymcilwaine/multi-client:$SHA ./client
+  - docker build -t finleymcilwaine/multi-server:latest -t finleymcilwaine/multi-server:$SHA ./server
+  - docker build -t finleymcilwaine/multi-worker:latest -t finleymcilwaine/multi-worker:$SHA ./worker
   # Push those production images to docker hub!
-  - docker push finleymcilwaine/multi-client 
-  - docker push finleymcilwaine/multi-nginx
-  - docker push finleymcilwaine/multi-server
-  - docker push finleymcilwaine/multi-worker
+  - docker push finleymcilwaine/multi-client:latest 
+  - docker push finleymcilwaine/multi-client:$SHA
+  - docker push finleymcilwaine/multi-server:latest
+  - docker push finleymcilwaine/multi-server:$SHA
+  - docker push finleymcilwaine/multi-worker:latest
+  - docker push finleymcilwaine/multi-worker:$SHA
 
 deploy:
-  edge: true
-  provider: elasticbeanstalk
-  region: us-east-2
-  app: multi-docker
-  env: MultiDocker-env
-  bucket_name: elasticbeanstalk-us-east-2-666739205128
-  bucket_path: docker-multi
+  provider: script
+  script: bash ./deploy.sh
   on:
     branch: master
-  access_key_id: $AWS_ACCESS_KEY
-  secret_access_key: $AWS_SECRET_KEY
