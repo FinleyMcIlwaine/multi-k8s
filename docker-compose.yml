@@ -12,7 +12,7 @@ services:
       context: ./server
     volumes:
       - /app/node_modules # leave the node modules as-is
-      - ./server:/app     # redirect accesses of /app to ./server
+      - ./server:/app
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
